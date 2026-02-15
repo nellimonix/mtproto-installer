@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-REPO_RAW="${REPO_RAW:-https://raw.githubusercontent.com/itcaat/mtproto-installer/main}"
+REPO_RAW="${REPO_RAW:-https://raw.githubusercontent.com/nellimonix/mtproto-installer/main}"
 INSTALL_DIR="${INSTALL_DIR:-$(pwd)/mtproxy-data}"
 FAKE_DOMAIN="${FAKE_DOMAIN:-1c.ru}"
 TELEMT_INTERNAL_PORT="${TELEMT_INTERNAL_PORT:-1234}"
@@ -28,7 +28,7 @@ fetch() {
 
 rerun_cmd() {
 	if [[ "$0" == *bash* ]] || [[ "$0" == -* ]]; then
-		echo "curl -sSL https://raw.githubusercontent.com/itcaat/mtproto-installer/main/install.sh | bash"
+		echo "curl -sSL https://raw.githubusercontent.com/nellimonix/mtproto-installer/main/install.sh | bash"
 	else
 		local dir
 		dir="$(cd "$(dirname "$0")" && pwd)"
@@ -153,12 +153,25 @@ generate_secret() {
 	openssl rand -hex 16
 }
 
-prompt_admin_tag() {
+show_secret_and_prompt_tag() {
+	local SECRET="$1"
+	local SERVER_IP="$2"
+	
+	echo ""
+	echo -e "${GREEN}═══════════════════════════════════════════════════════════${NC}"
+	echo -e "${GREEN}  Сгенерирован секрет прокси${NC}"
+	echo -e "${GREEN}═══════════════════════════════════════════════════════════${NC}"
+	echo ""
+	echo -e "  ${YELLOW}${SECRET}${NC}"
+	echo ""
+	echo "  Сохраните секрет в надежном месте!"
+	echo ""
+	
 	if [[ -n "${ADMIN_BOT_TAG}" ]]; then
 		return
 	fi
+	
 	if [[ -t 0 ]] || [[ -t 1 ]]; then
-		echo ""
 		echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
 		echo -e "${BLUE}  Admin Bot Tag для статистики (опционально)${NC}"
 		echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
@@ -166,7 +179,11 @@ prompt_admin_tag() {
 		echo "  Для отслеживания подключений через @MTProxybot:"
 		echo "  1. Откройте https://t.me/MTProxybot"
 		echo "  2. Отправьте команду /newproxy"
-		echo "  3. Скопируйте полученный тег"
+		echo "  3. Используйте данные:"
+		echo -e "     • IP: ${YELLOW}${SERVER_IP}${NC}"
+		echo -e "     • Port: ${YELLOW}${LISTEN_PORT}${NC}"
+		echo -e "     • Secret: ${YELLOW}${SECRET}${NC}"
+		echo "  4. Скопируйте полученный тег из ответа бота"
 		echo ""
 		echo -n "  Admin Bot Tag (Enter для пропуска): " > /dev/tty
 		read -r input < /dev/tty
@@ -179,6 +196,21 @@ prompt_admin_tag() {
 	fi
 }
 
+get_server_ip() {
+	local SERVER_IP=""
+	for url in https://ifconfig.me/ip https://icanhazip.com https://api.ipify.org https://checkip.amazonaws.com; do
+		raw=$(curl -s --connect-timeout 3 "$url" 2>/dev/null | tr -d '\n\r')
+		if [[ -n "$raw" ]] && [[ ! "$raw" =~ [[:space:]] ]] && [[ ! "$raw" =~ (error|timeout|upstream|reset|refused) ]] && [[ "$raw" =~ ^([0-9.]+|[0-9a-fA-F:]+)$ ]]; then
+			SERVER_IP="$raw"
+			break
+		fi
+	done
+	if [[ -z "$SERVER_IP" ]]; then
+		SERVER_IP="YOUR_SERVER_IP"
+	fi
+	echo "$SERVER_IP"
+}
+
 download_and_configure() {
 	info "Загрузка файлов из ${REPO_RAW} ..."
 	mkdir -p "${INSTALL_DIR}/traefik/dynamic" "${INSTALL_DIR}/traefik/static"
@@ -189,16 +221,9 @@ download_and_configure() {
 	fetch "${REPO_RAW}/telemt.toml.example" "${INSTALL_DIR}/telemt.toml.example"
 
 	SECRET=$(generate_secret)
+	SERVER_IP=$(get_server_ip)
 	
-	echo ""
-	echo -e "${GREEN}═══════════════════════════════════════════════════════════${NC}"
-	echo -e "${GREEN}  Сгенерирован секрет прокси${NC}"
-	echo -e "${GREEN}═══════════════════════════════════════════════════════════${NC}"
-	echo ""
-	echo -e "  ${YELLOW}${SECRET}${NC}"
-	echo ""
-	echo "  Сохраните секрет в надежном месте!"
-	echo ""
+	show_secret_and_prompt_tag "$SECRET" "$SERVER_IP"
 
 	sed -e "s/ПОДСТАВЬТЕ_32_СИМВОЛА_HEX/${SECRET}/g" \
 	    -e "s/tls_domain = \"1c.ru\"/tls_domain = \"${FAKE_DOMAIN}\"/g" \
@@ -283,7 +308,6 @@ main() {
 	check_docker
 	prompt_port
 	prompt_fake_domain
-	prompt_admin_tag
 	download_and_configure
 	run_compose
 	print_link
