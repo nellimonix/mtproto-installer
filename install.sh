@@ -88,9 +88,9 @@ prompt_port() {
 		warn "Порт 443 занят."
 		suggested=1443
 		while true; do
-			if [[ -t 0 ]]; then
-				echo -n "Введите порт [${suggested}]: "
-				read -r input
+			if [[ -t 0 ]] || [[ -t 1 ]]; then
+				echo -n "Введите порт [${suggested}]: " > /dev/tty
+				read -r input < /dev/tty
 				[[ -z "$input" ]] && input=$suggested
 			else
 				LISTEN_PORT=$suggested
@@ -108,24 +108,24 @@ prompt_port() {
 			fi
 		done
 	else
-		if [[ -t 0 ]]; then
-			echo -n "Порт для прокси [443]: "
-			read -r input
+		if [[ -t 0 ]] || [[ -t 1 ]]; then
+			echo -n "Порт для прокси [443]: " > /dev/tty
+			read -r input < /dev/tty
 			[[ -n "$input" ]] && input="$input" || input=443
 			while true; do
 				if [[ "$input" =~ ^[0-9]+$ ]] && (( input >= 1 && input <= 65535 )); then
 					if is_port_in_use "$input"; then
 						warn "Порт ${input} занят, выберите другой."
-						echo -n "Введите порт: "
-						read -r input
+						echo -n "Введите порт: " > /dev/tty
+						read -r input < /dev/tty
 					else
 						LISTEN_PORT=$input
 						return
 					fi
 				else
 					warn "Введите число от 1 до 65535."
-					echo -n "Введите порт [443]: "
-					read -r input
+					echo -n "Введите порт [443]: " > /dev/tty
+					read -r input < /dev/tty
 					[[ -z "$input" ]] && input=443
 				fi
 			done
@@ -134,14 +134,18 @@ prompt_port() {
 }
 
 prompt_fake_domain() {
-	if [[ -n "${FAKE_DOMAIN_FROM_ENV}" ]]; then
-		FAKE_DOMAIN="${FAKE_DOMAIN_FROM_ENV}"
+	if [[ -n "${FAKE_DOMAIN}" ]] && [[ "${FAKE_DOMAIN}" != "1c.ru" ]]; then
 		return
 	fi
-	if [[ -t 0 ]]; then
-		echo -n "Домен для маскировки Fake TLS [${FAKE_DOMAIN}]: "
-		read -r input
-		[[ -n "$input" ]] && FAKE_DOMAIN="$input"
+	if [[ -t 0 ]] || [[ -t 1 ]]; then
+		echo ""
+		echo -n "Домен для маскировки Fake TLS [1c.ru]: " > /dev/tty
+		read -r input < /dev/tty
+		if [[ -n "$input" ]]; then
+			FAKE_DOMAIN="$input"
+		else
+			FAKE_DOMAIN="1c.ru"
+		fi
 	fi
 }
 
@@ -153,7 +157,7 @@ prompt_admin_tag() {
 	if [[ -n "${ADMIN_BOT_TAG}" ]]; then
 		return
 	fi
-	if [[ -t 0 ]]; then
+	if [[ -t 0 ]] || [[ -t 1 ]]; then
 		echo ""
 		echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
 		echo -e "${BLUE}  Admin Bot Tag для статистики (опционально)${NC}"
@@ -164,8 +168,8 @@ prompt_admin_tag() {
 		echo "  2. Отправьте команду /newproxy"
 		echo "  3. Скопируйте полученный тег"
 		echo ""
-		echo -n "  Admin Bot Tag (Enter для пропуска): "
-		read -r input
+		echo -n "  Admin Bot Tag (Enter для пропуска): " > /dev/tty
+		read -r input < /dev/tty
 		if [[ -n "$input" ]]; then
 			ADMIN_BOT_TAG="$input"
 			info "Admin Bot Tag будет добавлен в конфигурацию"
@@ -200,7 +204,6 @@ download_and_configure() {
 	    -e "s/tls_domain = \"1c.ru\"/tls_domain = \"${FAKE_DOMAIN}\"/g" \
 	    "${INSTALL_DIR}/telemt.toml.example" > "${INSTALL_DIR}/telemt.toml"
 	
-	# Добавление или удаление stats_tag в зависимости от наличия
 	if [[ -n "$ADMIN_BOT_TAG" ]]; then
 		sed -i "s/stats_tag = \"ADMIN_BOT_TAG\"/stats_tag = \"${ADMIN_BOT_TAG}\"/" "${INSTALL_DIR}/telemt.toml"
 		info "Настроен Admin Bot Tag для статистики"
