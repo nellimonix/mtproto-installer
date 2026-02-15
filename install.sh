@@ -6,6 +6,7 @@ INSTALL_DIR="${INSTALL_DIR:-$(pwd)/mtproxy-data}"
 FAKE_DOMAIN="${FAKE_DOMAIN:-1c.ru}"
 TELEMT_INTERNAL_PORT="${TELEMT_INTERNAL_PORT:-1234}"
 LISTEN_PORT="${LISTEN_PORT:-443}"
+ADMIN_BOT_TAG="${ADMIN_BOT_TAG:-}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -147,6 +148,20 @@ generate_secret() {
 	openssl rand -hex 16
 }
 
+prompt_admin_tag() {
+	if [[ -n "${ADMIN_BOT_TAG}" ]]; then
+		return
+	fi
+	if [[ -t 0 ]]; then
+		echo ""
+		echo "Для отслеживания статистики можно указать Admin Bot Tag."
+		echo "Получить тег: https://t.me/MTProxybot -> /newproxy"
+		echo -n "Admin Bot Tag (Enter для пропуска): "
+		read -r input
+		[[ -n "$input" ]] && ADMIN_BOT_TAG="$input"
+	fi
+}
+
 download_and_configure() {
 	info "Загрузка файлов из ${REPO_RAW} ..."
 	mkdir -p "${INSTALL_DIR}/traefik/dynamic" "${INSTALL_DIR}/traefik/static"
@@ -161,6 +176,14 @@ download_and_configure() {
 	sed -e "s/ПОДСТАВЬТЕ_32_СИМВОЛА_HEX/${SECRET}/g" \
 	    -e "s/tls_domain = \"1c.ru\"/tls_domain = \"${FAKE_DOMAIN}\"/g" \
 	    "${INSTALL_DIR}/telemt.toml.example" > "${INSTALL_DIR}/telemt.toml"
+	
+	if [[ -n "$ADMIN_BOT_TAG" ]]; then
+		sed -i "s/stats_tag = \"ADMIN_BOT_TAG\"/stats_tag = \"${ADMIN_BOT_TAG}\"/" "${INSTALL_DIR}/telemt.toml"
+		info "Настроен Admin Bot Tag для статистики"
+	else
+		sed -i '/stats_tag = /d' "${INSTALL_DIR}/telemt.toml"
+	fi
+	
 	rm -f "${INSTALL_DIR}/telemt.toml.example"
 	info "Создан ${INSTALL_DIR}/telemt.toml (домен маскировки: ${FAKE_DOMAIN})"
 
@@ -229,6 +252,7 @@ main() {
 	check_docker
 	prompt_port
 	prompt_fake_domain
+	prompt_admin_tag
 	download_and_configure
 	run_compose
 	print_link

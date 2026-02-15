@@ -12,8 +12,29 @@
 
 ## Установка на сервере (всё тянется с GitHub)
 
+### Базовая установка
 ```bash
 curl -sSL https://raw.githubusercontent.com/itcaat/mtproto-installer/main/install.sh | bash
+```
+
+### С Admin Bot для статистики
+
+1. Получите тег бота: [@MTProxybot](https://t.me/MTProxybot) → `/newproxy`
+2. Установите с тегом:
+```bash
+ADMIN_BOT_TAG="ваш_тег" curl -sSL https://raw.githubusercontent.com/itcaat/mtproto-installer/main/install.sh | bash
+```
+
+### Дополнительные параметры
+
+- Домен маскировки: `FAKE_DOMAIN=sberbank.ru`
+- Каталог установки: `INSTALL_DIR=/opt/mtproxy`
+- Порт: `LISTEN_PORT=8443`
+- Admin Bot Tag: `ADMIN_BOT_TAG=ваш_тег`
+
+Пример полной установки:
+```bash
+FAKE_DOMAIN=sberbank.ru ADMIN_BOT_TAG=ваш_тег INSTALL_DIR=/opt/mtproxy curl -sSL ... | bash
 ```
 
 Скрипт установит Docker (если нужно), скачает `docker-compose.yml`, конфиги Traefik и шаблон Telemt из репозитория [itcaat/mtproto-installer](https://github.com/itcaat/mtproto-installer), сгенерирует секрет, подставит домен маскировки и запустит контейнеры. В конце выведет ссылку вида `tg://proxy?server=...&port=443&secret=...` — добавьте её в Telegram (Настройки → Данные и память → Использовать прокси).
@@ -102,6 +123,20 @@ curl -sSL https://raw.githubusercontent.com/itcaat/mtproto-installer/main/uninst
    ```
 
 После этого прокси и ссылка на него перестанут работать; образы Docker останутся в системе (`docker images`). При необходимости их можно удалить: `docker rmi traefik:v3.2 whn0thacked/telemt-docker:latest`.
+
+## Статистика подключений
+
+Для отслеживания статистики используйте [@MTProxybot](https://t.me/MTProxybot):
+
+1. Получите тег: `/newproxy` в боте
+2. При установке укажите тег через `ADMIN_BOT_TAG=ваш_тег`
+3. Или добавьте вручную в `telemt.toml`:
+```toml
+   [general]
+   stats_tag = "ваш_тег"
+```
+4. Перезапустите: `docker compose up -d --force-recreate`
+5. Проверьте статистику в боте командой `/myproxies > [PROXY] > Stats`
 
 ## Полезные команды
 
