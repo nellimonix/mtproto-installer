@@ -11,6 +11,7 @@ ADMIN_BOT_TAG="${ADMIN_BOT_TAG:-}"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m'
 
 info()  { echo -e "${GREEN}[INFO]${NC} $*"; }
@@ -154,11 +155,23 @@ prompt_admin_tag() {
 	fi
 	if [[ -t 0 ]]; then
 		echo ""
-		echo "Для отслеживания статистики можно указать Admin Bot Tag."
-		echo "Получить тег: https://t.me/MTProxybot -> /newproxy"
-		echo -n "Admin Bot Tag (Enter для пропуска): "
+		echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
+		echo -e "${BLUE}  Admin Bot Tag для статистики (опционально)${NC}"
+		echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
+		echo ""
+		echo "  Для отслеживания подключений через @MTProxybot:"
+		echo "  1. Откройте https://t.me/MTProxybot"
+		echo "  2. Отправьте команду /newproxy"
+		echo "  3. Скопируйте полученный тег"
+		echo ""
+		echo -n "  Admin Bot Tag (Enter для пропуска): "
 		read -r input
-		[[ -n "$input" ]] && ADMIN_BOT_TAG="$input"
+		if [[ -n "$input" ]]; then
+			ADMIN_BOT_TAG="$input"
+			info "Admin Bot Tag будет добавлен в конфигурацию"
+		else
+			info "Admin Bot Tag пропущен"
+		fi
 	fi
 }
 
@@ -172,16 +185,27 @@ download_and_configure() {
 	fetch "${REPO_RAW}/telemt.toml.example" "${INSTALL_DIR}/telemt.toml.example"
 
 	SECRET=$(generate_secret)
+	
+	echo ""
+	echo -e "${GREEN}═══════════════════════════════════════════════════════════${NC}"
+	echo -e "${GREEN}  Сгенерирован секрет прокси${NC}"
+	echo -e "${GREEN}═══════════════════════════════════════════════════════════${NC}"
+	echo ""
+	echo -e "  ${YELLOW}${SECRET}${NC}"
+	echo ""
+	echo "  Сохраните секрет в надежном месте!"
+	echo ""
 
 	sed -e "s/ПОДСТАВЬТЕ_32_СИМВОЛА_HEX/${SECRET}/g" \
 	    -e "s/tls_domain = \"1c.ru\"/tls_domain = \"${FAKE_DOMAIN}\"/g" \
 	    "${INSTALL_DIR}/telemt.toml.example" > "${INSTALL_DIR}/telemt.toml"
 	
+	# Добавление или удаление stats_tag в зависимости от наличия
 	if [[ -n "$ADMIN_BOT_TAG" ]]; then
 		sed -i "s/stats_tag = \"ADMIN_BOT_TAG\"/stats_tag = \"${ADMIN_BOT_TAG}\"/" "${INSTALL_DIR}/telemt.toml"
 		info "Настроен Admin Bot Tag для статистики"
 	else
-		sed -i '/stats_tag = /d' "${INSTALL_DIR}/telemt.toml"
+		sed -i '/^stats_tag = /d' "${INSTALL_DIR}/telemt.toml"
 	fi
 	
 	rm -f "${INSTALL_DIR}/telemt.toml.example"
@@ -241,6 +265,10 @@ print_link() {
 	echo ""
 	echo "  Сохраните ссылку и не публикуйте её публично."
 	echo ""
+	if [[ -n "$ADMIN_BOT_TAG" ]]; then
+		echo "  Статистика: https://t.me/MTProxybot → /myproxies > [PROXY] > Stats"
+		echo ""
+	fi
 	echo "  Данные установки: ${INSTALL_DIR}"
 	echo "  Логи:            cd ${INSTALL_DIR} && docker compose logs -f"
 	echo "  Остановка:       cd ${INSTALL_DIR} && docker compose down"
